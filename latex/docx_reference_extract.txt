@@ -1,0 +1,426 @@
+WADHWANI SCHOOL OF AI, IIT MADRAS
+Internship Report
+Multilingual Indic Text Embedding Model using Contrastive Learning
+Project ID: 2026/WSAI/029
+[TABLE]
+Submitted by | Surya Narayanaa
+Programme / Branch | B.E. Computer Science and Engineering - Artificial Intelligence and Machine Learning
+Internship Organization | Wadhwani School of AI, Indian Institute of Technology Madras
+Project Area | Multilingual Indic NLP, Sentence Embeddings, Cross-lingual Alignment, Contrastive Learning
+Internship Period Covered in Report | 11 May 2026 - 12 June 2026
+Faculty Guide / Mentor | [To be filled]
+[/TABLE]
+Date of Submission: [To be filled]
+Acknowledgement
+I would like to express my sincere gratitude to the Wadhwani School of AI, IIT Madras, for providing me the opportunity to work on the project titled "Multilingual Indic Text Embedding Model using Contrastive Learning". I am thankful to my faculty guide and mentors for their guidance in understanding the research problem, selecting meaningful evaluation metrics, and improving the experimental design from a simple embedding benchmark into a deeper alignment and fine-tuning study. I also thank the project members and peers who helped clarify reporting procedures, compare benchmark interpretations, and discuss evaluation design choices throughout the internship.
+Abstract
+This report presents the work carried out during the WSAI Summer Internship on multilingual Indic sentence embeddings. The objective of the project was to evaluate and improve cross-lingual alignment for Indian languages, with a focus on Indic-Indic sentence representation using contrastive-learning-based methods. The work began with a literature survey of Indic NLP resources, Sentence-BERT, Contriever/mContriever, SimCSE, and LaBSE. It then moved into the design of benchmarking pipelines using FLORES-200, Samanantar, and IN22-Gen/IN22-Conv. Several embedding models were compared using retrieval metrics, alignment metrics, and separation metrics. The experiments showed that LaBSE is a strong baseline for cross-lingual alignment, but that average cosine similarity alone can be misleading when wrong pairs also receive high similarity. Therefore, cosine gap, Accuracy@1, Recall@10, MRR, sensitivity, and specificity were used together for a more reliable evaluation. The final stage explored LaBSE fine-tuning on top-performing and bottom-performing Indic language pairs. Single-pair fine-tuning improved cosine-gap performance over the baseline, while combined bottom-pair training showed signs of conflicting training signals. The report concludes that LaBSE remains the most reliable overall model for Indic alignment, Vyakyarth is a strong competitor in cosine-gap separation, and targeted contrastive fine-tuning is a promising direction for low-resource Indic languages.
+Executive Summary
+The project focused on multilingual Indic sentence embeddings, especially whether semantically equivalent sentences in different Indic languages are close in embedding space.
+The first benchmark used FLORES-200 with six languages and ten models; LaBSE achieved 99.87% average Accuracy@1, followed by multilingual MPNet and MuRIL.
+A later Samanantar benchmark clarified the difference between threshold-based cosine evaluation, average gold-pair cosine, and retrieval-based Accuracy@1.
+Indic-Indic benchmarking was extended using FLORES-200 and Samanantar-EnglishPivot. LaBSE achieved mean gold cosine 0.8477 on FLORES-200 and 0.7873 on Samanantar-EnglishPivot.
+The final evaluation moved to IN22-Gen and IN22-Conv to cover all 22 scheduled Indic languages. IN22-Gen was easier than IN22-Conv, and English-Indic alignment was stronger than Indic-Indic alignment.
+LaBSE was the strongest overall Indic-Indic model when retrieval and separation were considered together. Vyakyarth had a slightly higher cosine gap but lower Accuracy@1 and Recall@10 than LaBSE.
+Sensitivity and specificity were added based on professor feedback to measure true-pair acceptance and random-pair rejection at midpoint and optimal thresholds.
+Fine-tuning experiments showed that single-pair contrastive fine-tuning improved cosine gap over the LaBSE baseline, while combined bottom-pair training degraded performance.
+Table of Contents
+1. Introduction
+2. Problem Statement and Objectives
+3. Literature Survey
+4. Datasets Used
+5. Models Evaluated
+6. Evaluation Methodology
+7. Experimental Work and Results
+8. Fine-tuning Experiments
+9. Discussion
+10. Implementation Details
+11. Limitations
+12. Future Work
+13. Conclusion
+Appendix A. Daily and Weekly Progress Log
+Appendix B. Notebooks and Artifacts
+Appendix C. Detailed Notion Literature Review Notes
+References
+1. Introduction
+India has a large linguistic landscape with many scheduled languages, multiple scripts, and unequal availability of digital resources. In multilingual NLP, a sentence embedding model should map semantically equivalent sentences from different languages to nearby vectors in a shared representation space. Such embeddings are useful for cross-lingual retrieval, translation mining, semantic search, alignment analysis, clustering, and downstream multilingual applications.
+The project, "Multilingual Indic Text Embedding Model using Contrastive Learning", investigated how well existing multilingual and Indic-focused embedding models align Indic languages. The work progressed from small pilot benchmarks to all-pair multilingual evaluation, then to IN22 evaluation across all 22 scheduled Indic languages, and finally to LaBSE fine-tuning on selected strong and weak language pairs.
+A central lesson from the project is that high cosine similarity between gold translation pairs is not sufficient by itself. A model can assign high similarity to correct pairs and also assign high similarity to wrong pairs. For a useful embedding space, correct pairs must be close while incorrect pairs must be clearly farther away. This separation was captured using cosine gap, retrieval metrics, and later sensitivity/specificity analysis.
+2. Problem Statement and Objectives
+2.1 Problem Statement
+The problem is to evaluate and improve sentence embedding alignment for Indic languages. Given two sentences in different languages that express the same meaning, the embedding model should place them close together. Given unrelated or randomly mismatched sentences, the model should place them farther apart. The project specifically focused on multilingual Indic text embedding using contrastive learning and evaluated whether existing models can support reliable cross-lingual and Indic-Indic alignment.
+2.2 Objectives
+Study the literature on Indic NLP resources, multilingual sentence embeddings, and contrastive learning.
+Build a benchmark pipeline for evaluating multilingual sentence embedding alignment.
+Compare multiple embedding/backbone models on FLORES-200, Samanantar, and IN22 benchmarks.
+Evaluate both English-Indic and Indic-Indic language directions.
+Compare threshold cosine, average cosine, retrieval metrics, cosine gap, sensitivity, and specificity.
+Identify strong and weak language-pair directions, especially for low-resource Indic languages.
+Fine-tune LaBSE using selected top-performing and bottom-performing language pairs and evaluate generalisation.
+2.3 Scope
+The work is sentence-level rather than document-level. The primary task is alignment and retrieval of parallel sentences. The project does not train a new embedding model from scratch; it evaluates pretrained models and fine-tunes LaBSE variants using contrastive objectives. The final benchmarks focus on IN22-Gen and IN22-Conv because they cover all 22 scheduled Indic languages plus English.
+3. Literature Survey
+The literature survey was completed during 12-15 May 2026 and covered Indic NLP resources, sentence embedding models, dense retrieval, and contrastive learning. The following subsections summarize the main learning outcomes and how each paper connects to the project.
+[TABLE]
+Paper / Topic | Main idea studied | Relevance to this project
+IndicBERT v2, IndicCorp v2, IndicXTREME | Indic-specific corpora, benchmarks, and models for Indian languages; limitations of general multilingual models on low-resource Indic languages. | Motivated the need for Indic-specific evaluation and helped identify datasets such as FLORES, IndicXParaphrase, Samanantar, and IN22.
+Sentence-BERT (SBERT) | Siamese/triplet architecture for generating sentence embeddings; pooling strategies; cosine similarity; STS/NLI training. | Provided the foundation for sentence embedding evaluation and efficient nearest-neighbour similarity search.
+Contriever / mContriever | Unsupervised dense retrieval using contrastive learning, random cropping positives, and in-batch negatives. | Motivated contrastive training in low-label settings and provided retrieval-oriented baselines.
+SimCSE | Simple contrastive learning for sentence embeddings; dropout positives for unsupervised training and NLI pairs for supervised training. | Introduced alignment, uniformity, anisotropy, and contrastive sentence representation concepts.
+LaBSE | Language-agnostic BERT sentence embeddings using dual encoder, translation ranking loss, additive margin softmax, and MLM/TLM pretraining. | Became the main baseline because it is explicitly designed for multilingual sentence alignment.
+[/TABLE]
+The literature survey shaped the final evaluation design. SBERT and LaBSE motivated sentence-level embedding comparison; Contriever and SimCSE motivated contrastive learning and in-batch negative ideas; IndicBERT/IndicCorp/IndicXTREME motivated the need to evaluate Indic languages specifically instead of relying only on global multilingual benchmarks.
+4. Datasets Used
+4.1 FLORES-200
+FLORES-200 was used for the initial cross-lingual benchmark and for a clean Indic-Indic evaluation. The dev and devtest splits were combined, giving 2,009 aligned examples per language in the pilot benchmark. Because FLORES is multi-way aligned, row i in one language corresponds to the same underlying meaning as row i in another language. This makes it suitable for retrieval-style evaluation.
+4.2 Samanantar and Samanantar-EnglishPivot
+Samanantar was used in two ways. First, it was used for English-Indic retrieval and gold-pair cosine evaluation. Second, because direct Indic-Indic parallel files were not available in the used setup, Indic-Indic pairs were constructed through an English pivot. English(A)-Indic1(B) and English(A)-Indic2(C) pairs were joined using normalized English text to form inferred Indic1(B)-Indic2(C) pairs. This created a useful but noisier benchmark because the Indic-Indic pair is inferred rather than directly verified.
+4.3 IN22-Gen and IN22-Conv
+The final benchmark moved to IN22 because it covers all 22 scheduled Indic languages plus English. IN22-Gen contains general-domain sentences such as news, Wikipedia-style, culture, and general information. IN22-Conv contains conversational and daily-use sentences, making it a harder and more informal test setting. The evaluation used two tracks: 462 Indic-Indic directed pairs and 44 English-Indic bidirectional pairs.
+[TABLE]
+Dataset | Coverage / size used | Role in project
+FLORES-200 | dev + devtest; 2,009 examples per language in pilot; clean multi-way alignment | Initial benchmark and clean Indic-Indic reference evaluation
+Samanantar | English-Indic parallel samples; 2,000 pairs in retrieval benchmark; 1,000 inferred Indic-Indic pairs per direction in pivot benchmark | Real-world/pivot-based comparison and threshold vs retrieval analysis
+IN22-Gen | 1,024 parallel sentences; 22 scheduled Indic languages + English | General-domain final evaluation and fine-tuning source
+IN22-Conv | 1,503 parallel sentences; 22 scheduled Indic languages + English | Unseen conversational evaluation for baseline and fine-tuned models
+[/TABLE]
+5. Models Evaluated
+The project evaluated both sentence-transformer models and raw multilingual/Indic backbone models. Sentence-transformer models were used with their packaged pooling, while backbone models were evaluated using Hugging Face AutoModel with attention-mask mean pooling. This distinction is important because a strong language model is not automatically a strong sentence embedding model.
+[TABLE]
+Model | Type / checkpoint | Reason for inclusion
+LaBSE | sentence-transformers/LaBSE | Primary multilingual sentence alignment baseline.
+Multilingual MPNet | sentence-transformers/paraphrase-multilingual-mpnet-base-v2 | Strong general multilingual sentence-transformer baseline.
+MuRIL | google/muril-base-cased | Indic-focused multilingual model.
+IndicBERTv2-SS | ai4bharat/IndicBERTv2-SS | Indic-focused backbone baseline.
+XLM-RoBERTa base | FacebookAI/xlm-roberta-base | General multilingual backbone baseline.
+SBERT multilingual MiniLM | paraphrase-multilingual-MiniLM-L12-v2 | Lightweight sentence-transformer baseline.
+Contriever / mContriever | facebook/contriever, facebook/mcontriever | Dense retrieval baselines, including multilingual retrieval.
+SimCSE variants | supervised RoBERTa and multilingual XLM-R variants | Contrastive sentence embedding baselines.
+Vyakyarth | Indic embedding model | Compared in later IN22 evaluation; strong cosine-gap behaviour.
+[/TABLE]
+6. Evaluation Methodology
+6.1 Embedding and Similarity Pipeline
+Load aligned sentences from the chosen dataset.
+Encode source and target language sentences into vector embeddings.
+Normalize embeddings so that dot product is equivalent to cosine similarity.
+Construct an n x n similarity matrix for each directed language pair.
+Treat the diagonal entries as gold translation-pair similarities.
+Use off-diagonal or shuffled entries as random/wrong-pair similarities.
+Compute retrieval, alignment, separation, and threshold-based metrics.
+Save summary CSVs, pair-level CSVs, plots, heatmaps, and error examples.
+6.2 Metrics
+[TABLE]
+Metric | Meaning | Interpretation
+Accuracy@1 | Fraction of cases where the correct translation is ranked first. | Primary retrieval signal. Higher is better.
+Recall@10 | Fraction of cases where the correct translation is within top 10 candidates. | Measures whether the gold pair is near the top even if not rank 1.
+MRR | Mean reciprocal rank of the correct translation. | Rewards gold translations appearing near the top.
+Mean gold cosine | Average cosine similarity of true translation pairs. | Alignment score, but insufficient alone.
+Mean random cosine | Average similarity of random/wrong sentence pairs. | High values indicate score inflation or poor uniformity.
+Cosine gap | mean_gold_cosine - mean_random_cosine. | Primary separation/discrimination signal.
+Sensitivity | Fraction of true pairs above threshold. | True positive rate.
+Specificity | Fraction of random pairs below threshold. | True negative rate.
+[/TABLE]
+6.3 Threshold Design for Sensitivity and Specificity
+Based on professor feedback, sensitivity and specificity were added to the IN22 evaluation. For each directed language pair, a single threshold t is used for both gold and random pairs. Sensitivity measures how many gold pairs score above t, while specificity measures how many random pairs score below t. Two thresholding schemes were used: midpoint threshold and optimal threshold.
+Midpoint threshold: t = (mean_gold_cosine + mean_random_cosine) / 2 for each language pair.
+Optimal threshold: selected by grid search to maximize F1 for that language pair.
+Thresholds are computed independently per directed pair; the average threshold is only a summary and is not used as one global cutoff.
+7. Experimental Work and Results
+7.1 Pilot FLORES-200 Cross-lingual Retrieval Benchmark
+The first benchmark evaluated 10 models on FLORES-200 using six languages: English, Hindi, Bengali, Telugu, Tamil, and Malayalam. All directed cross-language pairs were evaluated, excluding same-language pairs. This produced 300 rows: 10 models x 30 directed language pairs.
+[TABLE]
+Rank | Model | Avg Accuracy@1 | Avg Recall@10 | Avg MRR | Avg cosine gap
+1 | LaBSE | 99.87% | 99.94% | 0.9990 | 0.5918
+2 | Multilingual MPNet | 87.20% | 96.14% | 0.9052 | 0.6141
+3 | MuRIL | 77.61% | 91.88% | 0.8272 | 0.0033
+4 | SimCSE-XLMR multilingual | 53.46% | 80.30% | 0.6278 | 0.3328
+5 | mContriever | 45.03% | 70.68% | 0.5395 | 0.1469
+6 | SBERT multilingual MiniLM | 22.59% | 31.64% | 0.2581 | 0.2024
+7 | XLM-RoBERTa base | 21.42% | 45.55% | 0.2962 | 0.0012
+8 | Contriever | 6.06% | 12.30% | 0.0843 | 0.0364
+9 | IndicBERTv2-SS | 5.37% | 6.96% | 0.0612 | 0.0076
+10 | SimCSE RoBERTa supervised | 0.41% | 1.92% | 0.0114 | 0.0021
+[/TABLE]
+Figure 1. FLORES-200 pilot benchmark: average Accuracy@1 across all directed language pairs.
+LaBSE was the strongest alignment model in the pilot benchmark. Multilingual MPNet was the next strongest general sentence-transformer baseline. MuRIL gave useful retrieval results but had a very small cosine gap, showing that cosine-gap magnitudes are not always directly comparable across model families. XLM-RoBERTa and IndicBERTv2-SS were weak under simple mean pooling, showing that raw backbones need adaptation before being used as sentence embeddings.
+7.2 Comparing Threshold, Average Cosine, and Retrieval Benchmarks
+A major part of the work was understanding why different benchmark designs can produce different-looking results. Three benchmark setups were compared: Nikunj’s threshold benchmark, Samanantar retrieval benchmark, and Samanantar average gold-pair cosine benchmark.
+[TABLE]
+Benchmark | Main metric | Question answered
+Gold-pair threshold | % of true pairs above fixed cosine thresholds such as 0.80 | Are true pairs close enough in absolute cosine terms?
+Average gold-pair cosine | Mean/median cosine of aligned gold pairs | How close are true pairs on average?
+Translation retrieval | Accuracy@1, Recall@10, MRR, cosine gap | Is the correct translation ranked above all wrong candidates?
+[/TABLE]
+[TABLE]
+Model | Samanantar Avg Accuracy@1 | Avg Recall@10 | Avg MRR | Avg cosine gap
+LaBSE | 0.9308 | 0.9517 | 0.9392 | 0.5918
+Multilingual MPNet | 0.6555 | 0.8295 | 0.7180 | 0.5296
+MuRIL | 0.4985 | 0.7224 | 0.5774 | 0.0037
+SBERT multilingual MiniLM | 0.3200 | 0.4820 | 0.3771 | 0.3132
+mContriever | 0.2107 | 0.4049 | 0.2775 | 0.0949
+IndicBERTv2-SS | 0.1122 | 0.1580 | 0.1305 | 0.0319
+XLM-RoBERTa base | 0.0997 | 0.2448 | 0.1505 | 0.0040
+[/TABLE]
+The key conclusion was that these metrics are related but not interchangeable. A pair with cosine 0.75 fails a strict >0.80 threshold, but it can still be correctly retrieved if wrong candidates have lower cosine values. Therefore, final reporting should include both alignment-style metrics and retrieval/separation metrics.
+Figure 2. Samanantar retrieval benchmark: average Accuracy@1 by model.
+7.3 LaBSE Indic-Indic Evaluation on FLORES-200 and Samanantar-EnglishPivot
+After English-Indic evaluation, the project moved toward Indic-Indic alignment. FLORES-200 provided clean multi-way aligned sentence pairs, while Samanantar-EnglishPivot provided a noisier inferred Indic-Indic benchmark through English joining.
+[TABLE]
+Dataset | Pair construction | Pairs evaluated | Examples per pair | Mean gold cosine | % > 0.80 | Cosine gap
+FLORES-200 | Clean row-aligned dev + devtest | 110 directed pairs | 2,009 | 0.847733 | 0.775818 | 0.565966
+Samanantar-EnglishPivot | Indic-Indic pairs inferred through normalized English pivot | 110 directed pairs | 1,000 | 0.787345 | 0.549273 | 0.501755
+[/TABLE]
+The mean gold cosine was higher on FLORES-200 than on Samanantar-EnglishPivot. This supports the interpretation that FLORES-200 is cleaner, while the English-pivot construction introduces additional noise. However, the cosine gap remained high in both settings, confirming that LaBSE can separate true Indic-Indic pairs from random wrong pairs in these datasets.
+Figure 3. Dataset-level comparison between FLORES-200 and Samanantar-EnglishPivot.
+7.4 IN22 Benchmark Across 22 Scheduled Indic Languages
+The final evaluation moved to IN22-Gen and IN22-Conv to cover all 22 scheduled Indic languages. This expanded the benchmark from a smaller pilot to 462 Indic-Indic directed pairs and 44 English-Indic bidirectional pairs. The primary alignment metrics were mean gold-pair cosine and cosine gap, while Accuracy@1, Recall@10, and MRR supported retrieval interpretation.
+[TABLE]
+Track | Directions evaluated | Purpose
+Indic-Indic | 22 x 21 = 462 directed pairs | Main track; measures alignment between scheduled Indic languages.
+English-Indic bidirectional | 22 English->Indic + 22 Indic->English = 44 directed pairs | Checks how well Indic embeddings align with English as reference language.
+[/TABLE]
+7.5 IN22 Model Comparison
+[TABLE]
+Model | Mean gold cosine | Mean random cosine | Cosine gap | Accuracy@1 | Recall@10 | Interpretation
+LaBSE | 0.5602 | 0.1704 | 0.3898 | 0.6544 | 0.7338 | Best overall Indic-Indic performer
+Vyakyarth | 0.4971 | 0.1062 | 0.3910 | 0.4937 | 0.6277 | Highest gap, lower retrieval than LaBSE
+Multilingual MPNet | 0.5682 | 0.2340 | 0.3342 | 0.4046 | 0.5506 | Strong general multilingual baseline
+MuRIL | 0.9868 | 0.9849 | 0.0018 | 0.2375 | 0.3787 | High cosine but weak separation
+XLM-RoBERTa base | 0.9928 | 0.9913 | 0.0015 | 0.0877 | 0.1969 | Very high cosine, poor separation
+[/TABLE]
+Vyakyarth had a marginally higher cosine gap than LaBSE, but LaBSE had much stronger Accuracy@1 and Recall@10. This means LaBSE is more reliable when the model must choose the correct translation among many candidates. XLM-RoBERTa and MuRIL demonstrated why mean cosine alone is risky: both had extremely high mean gold cosine but near-zero cosine gap because random pairs were also highly similar.
+Figure 4. IN22 cosine gap by model for English-Indic and Indic-Indic tracks.
+7.6 LaBSE Baseline on IN22-Gen and IN22-Conv
+[TABLE]
+Dataset suite | Track | Mean gold cosine | Mean random cosine | Cosine gap | Accuracy@1 | Recall@10 | MRR
+IN22-Gen | Indic-Indic | 0.5932 | 0.1806 | 0.4126 | 0.7433 | 0.7870 | 0.7595
+IN22-Conv | Indic-Indic | 0.5271 | 0.1602 | 0.3669 | 0.5655 | 0.6806 | 0.6072
+Overall | Indic-Indic | 0.5602 | 0.1704 | 0.3898 | 0.6544 | 0.7338 | 0.6833
+Overall | English-Indic bidir | 0.6899 | 0.1542 | 0.5357 | 0.8232 | 0.8702 | -
+[/TABLE]
+IN22-Gen was easier for LaBSE than IN22-Conv. Accuracy@1 fell from 0.7433 on IN22-Gen to 0.5655 on IN22-Conv for Indic-Indic alignment. This is expected because conversational text is shorter, more informal, and more semantically variable. Even then, LaBSE maintained a positive cosine gap of 0.3669 on IN22-Conv, showing useful separation.
+Figure 5. LaBSE Indic-Indic mean gold cosine heatmap on IN22. Weaker regions appear for low-resource/script-specific languages such as Meitei and Santali.
+7.7 Sensitivity and Specificity Results
+Sensitivity and specificity were added to test how well the embedding space separates true translation pairs from random wrong pairs. The midpoint threshold uses one threshold per language pair. The optimal threshold provides a ceiling estimate by maximizing F1.
+[TABLE]
+Metric | IN22-Gen Indic-Indic | IN22-Conv Indic-Indic
+mean_gold_cosine ± SD | 0.5932 ± 0.1146 | 0.5271 ± 0.1519
+mean_random_cosine ± SD | 0.1806 ± 0.0988 | 0.1602 ± 0.1040
+cosine_gap ± SD | 0.4126 ± 0.1451 | 0.3669 ± 0.1634
+sensitivity (midpoint) | 0.8322 | 0.8176
+specificity (midpoint) | 0.9183 | 0.8978
+sensitivity (optimal) | 0.9405 | 0.9352
+specificity (optimal) | 0.7871 | 0.7754
+best F1 (optimal) | 0.8911 | 0.8763
+[/TABLE]
+The midpoint sensitivity and specificity values show that LaBSE does not merely inflate all cosine scores. It accepts a large fraction of true pairs while rejecting most random pairs. This supports the interpretation that the embedding space is genuinely discriminative for most Indic languages.
+8. Fine-tuning Experiments
+8.1 Motivation
+After identifying strong and weak language directions, LaBSE fine-tuning was explored to check whether contrastive training on selected pairs can improve alignment. The training experiments focused on top-5 and bottom-5 language pairs from IN22 alignment results. The core idea was to compare whether training on already strong directions, weak directions, or mixed directions leads to better generalisation on unseen IN22-Conv.
+8.2 Fine-tuning Setup
+[TABLE]
+Parameter | Final 13-model evaluation setup
+Base model | sentence-transformers/LaBSE
+Training data | IN22-Gen sentence pairs
+Evaluation data | IN22-Conv, unseen conversational domain
+Directed pairs evaluated | 462 Indic-Indic pairs across all 22 scheduled Indic languages
+Max sequence length | 128 tokens
+Batch size | 32
+Epochs | 5 in final 13-model report; earlier notebooks also explored 10-epoch checkpointed variants
+Learning rate | 5e-6 in final 13-model report
+Training/validation split | 900 train / 100 validation examples per single-pair run
+Model selection | Best checkpoint selected using validation cosine gap
+[/TABLE]
+8.3 Fine-tuning Strategies
+Five single top-pair models: one model per high-performing directed pair.
+Five single bottom-pair models: one model per low-performing directed pair.
+One top5_all_directed_pairs model trained on all top-5 pairs together.
+One bottom5_all_directed_pairs model trained on all bottom-5 pairs together.
+One mixed_top5_bottom5 model trained on all 10 top and bottom pairs together.
+8.4 Fine-tuning Results
+[TABLE]
+Model | Cosine gap | Sensitivity | Specificity | Accuracy@1
+bottom_single_5_ben_to_mni | 0.4624 | 0.8867 | 0.9320 | 0.5796
+bottom_single_4_kan_to_sat | 0.4573 | 0.8842 | 0.9321 | 0.5788
+top_single_5_guj_to_urd | 0.4553 | 0.8336 | 0.9257 | 0.5741
+top_single_2_urd_to_guj | 0.4549 | 0.8331 | 0.9265 | 0.5757
+top_single_4_guj_to_mar | 0.4534 | 0.8314 | 0.9261 | 0.5748
+top_single_3_ben_to_kan | 0.4506 | 0.8313 | 0.9260 | 0.5728
+top_single_1_kan_to_tel | 0.4401 | 0.8260 | 0.9265 | 0.5730
+bottom_single_3_sat_to_hin | 0.4232 | 0.8675 | 0.9353 | 0.5855
+bottom_single_2_sat_to_urd | 0.4199 | 0.8668 | 0.9361 | 0.5853
+bottom_single_1_sat_to_npi | 0.4135 | 0.8636 | 0.9360 | 0.5837
+top5_all_directed_pairs | 0.4007 | 0.8192 | 0.9272 | 0.5763
+LaBSE baseline | 0.3670 | 0.8069 | 0.9180 | 0.5654
+mixed_top5_bottom5 | 0.3412 | 0.8929 | 0.8592 | 0.4916
+bottom5_all_directed_pairs | 0.2286 | 0.8893 | 0.7750 | 0.3945
+[/TABLE]
+Figure 6. IN22-Conv cosine gap for all 13 fine-tuned LaBSE models compared with baseline.
+8.5 Interpretation of Fine-tuning Results
+All 10 single-pair models improved cosine gap over the LaBSE baseline.
+The best model was bottom_single_5_ben_to_mni with cosine gap 0.4624, an improvement of +0.0954 over baseline 0.3670.
+Bottom-pair models performed surprisingly well, suggesting that training on difficult low-resource/script-specific directions can improve separation across the full set of 462 pairs.
+top5_all_directed_pairs improved over baseline but less than most single-pair models.
+bottom5_all_directed_pairs performed worst, suggesting that combining multiple difficult low-resource directions with limited examples may introduce conflicting gradients and reduce general alignment.
+mixed_top5_bottom5 achieved high sensitivity but lower specificity and lower Accuracy@1, meaning it became too inclusive and allowed more false positives.
+9. Discussion
+9.1 Alignment vs Uniformity
+The project repeatedly showed that alignment and uniformity must be evaluated together. Alignment means true translation pairs are close. Uniformity means the vector space is spread out so that wrong candidates are not also close. Average gold-pair cosine mainly checks alignment, while retrieval metrics and cosine gap check whether correct pairs can be separated from wrong pairs.
+9.2 Why Mean Cosine Alone Can Mislead
+XLM-RoBERTa and MuRIL under mean pooling showed very high mean gold-pair cosine in some benchmarks, but their random-pair cosine was also very high. This means the embedding space had score inflation or anisotropy: many sentences became close to many other sentences. Such a model can look strong under average cosine but fail under retrieval because the correct translation is not distinctly separated.
+9.3 Language Resource and Script Effects
+The IN22 analysis showed strong variation across languages. Many high-resource languages had strong cosine gaps, while Manipuri/Meitei and Santali were critical weak points. Their low mean gold cosine and small gap suggest that the model does not align these languages well with the rest of the Indic space. This may be connected to limited representation in multilingual training data and script-specific challenges such as Meitei Mayek and Ol Chiki.
+9.4 General-domain vs Conversational-domain Evaluation
+IN22-Conv was consistently harder than IN22-Gen. Conversational sentences are shorter, more informal, and more dependent on context. This reduced Accuracy@1 and cosine gap, but also made IN22-Conv a valuable evaluation set for testing whether fine-tuned models generalise beyond formal/general-domain text.
+10. Implementation Details
+Implemented evaluation notebooks in Google Colab / Python using sentence-transformers, Hugging Face Transformers, PyTorch, NumPy, pandas, scikit-learn, tqdm, and plotting libraries.
+Used embedding caches per model-language-split-size combination to avoid recomputation.
+Generated similarity matrices for every source-target pair and computed diagonal gold-pair scores and random-pair scores.
+Saved metrics CSVs, model summaries, language-pair summaries, best/worst pair tables, error files, heatmaps, and report documents.
+Implemented all-pair directed evaluation, English-Indic bidirectional evaluation, Indic-Indic evaluation, midpoint/optimal threshold sensitivity-specificity evaluation, and fine-tuning/evaluation notebooks.
+Used MultipleNegativesRankingLoss during LaBSE fine-tuning, where other examples in the batch act as implicit negatives.
+10.1 Key Notebooks and Artifacts
+[TABLE]
+Artifact | Purpose
+indic_embedding_benchmark_colab.ipynb | Initial FLORES-200 all-pair model benchmark.
+Samanantar benchmark notebooks | Compared retrieval, average cosine, and threshold-style evaluation.
+labse_indic_alignment_gen_train_conv_eval.ipynb | Fine-tuning on top/bottom source-language groups and IN22-Conv evaluation.
+labse_indic_alignment_directed_pairs_gen_train_conv_eval.ipynb variants | Corrected directed-pair protocol with top-5 and bottom-5 exact language directions.
+labse_13_model_directed_pair_finetuning.ipynb | 13-model sweep over top-pair, bottom-pair, combined, and mixed fine-tuning strategies.
+DOCX/PDF reports | Formal benchmark summaries and visual analysis reports.
+[/TABLE]
+11. Limitations
+The evaluation is sentence-level and does not directly test document retrieval or long-context semantic search.
+Some backbone models were evaluated with simple mean pooling, so their results should not be treated as their best possible performance.
+Samanantar-EnglishPivot Indic-Indic evaluation is noisy because pairs are inferred through English rather than directly verified.
+Fine-tuning used limited examples and short training runs, so more extensive hyperparameter tuning may change conclusions.
+Sensitivity/specificity thresholds were computed per language pair, so care is needed when comparing aggregated thresholds.
+The paper-reading notes linked through Notion were not directly accessible inside this environment; the literature-review section uses the paper summaries provided in the chat and project notes.
+12. Future Work
+Run larger and more systematic fine-tuning experiments with controlled hyperparameter sweeps.
+Test hard-negative mining instead of relying only on in-batch negatives.
+Evaluate whether low-resource languages such as Manipuri/Meitei and Santali improve with script-aware preprocessing or transliteration support.
+Compare LaBSE, Vyakyarth, MPNet, and fine-tuned LaBSE variants on external retrieval datasets such as MIRACL or Indic-specific retrieval benchmarks.
+Add qualitative error analysis for weak language pairs by inspecting source sentence, gold translation, predicted nearest neighbour, and similarity margins.
+Study whether combining top and bottom pairs with balanced sampling or curriculum learning avoids the degradation observed in bottom5_all_directed_pairs.
+Create a reusable benchmark package with configuration files, cached embeddings, metric scripts, and automatic report generation.
+13. Conclusion
+The internship work built a progressively stronger evaluation pipeline for multilingual Indic sentence embeddings. Starting from a FLORES-200 retrieval benchmark, the project expanded to Samanantar, English-pivot Indic-Indic evaluation, and finally IN22 evaluation covering all 22 scheduled Indic languages. The project showed that LaBSE is the strongest overall baseline for Indic alignment when both retrieval and separation are considered. Vyakyarth is a strong alignment competitor because of its high cosine gap, but LaBSE remains more reliable in Accuracy@1, Recall@10, and MRR.
+The most important methodological conclusion is that average cosine similarity alone is insufficient. A useful embedding model must keep true translation pairs close and random/wrong pairs far apart. Therefore, cosine gap, retrieval metrics, sensitivity, specificity, and error analysis should be reported together. The fine-tuning experiments showed that targeted single-pair contrastive fine-tuning can improve LaBSE over the baseline, especially when training on weak pair directions. However, combined bottom-pair training can degrade performance, indicating that low-resource directions require careful sampling and training design.
+Overall, the project establishes a clear baseline and evaluation framework for future work on multilingual Indic text embeddings using contrastive learning. It also identifies the main research gap: improving robust Indic-Indic alignment for low-resource and script-specific languages without reducing general cross-lingual performance.
+Appendix A. Daily and Weekly Progress Log
+A.1 Daily Progress Log
+[TABLE]
+Date | Work completed
+11-May-2026 | Contacted referred project member Glenn, clarified that he was working on a different project, and confirmed assigned Project ID 2026/WSAI/029. Learned daily and weekly report format.
+12-May-2026 | Read IndicBERT v2, IndicCorp v2, and IndicXTREME papers. Identified FLORES, IndicXParaphrase, and Samanantar as relevant datasets.
+13-May-2026 | Read SBERT paper. Studied siamese/triplet sentence embedding design, pooling, cosine similarity, STS/NLI objectives, and efficient similarity search.
+14-May-2026 | Read Contriever/mContriever and SimCSE papers. Studied contrastive learning, dropout positives, random cropping, negative sampling, alignment, uniformity, and anisotropy.
+15-May-2026 | Read LaBSE paper and built a Colab notebook for evaluating different Indic embedding models.
+19-May-2026 | Understood benchmark code in detail and updated it to compare all language pairs, saving metrics, summaries, plots, and error files.
+20-May-2026 | Converted benchmark results into a report.
+21-May-2026 | Analyzed the difference between Accuracy@1 retrieval evaluation and cosine-similarity threshold evaluation.
+22-May-2026 | Created Samanantar average-cosine benchmark to compare gold-pair cosine scores.
+25-May-2026 | Analyzed English pivot construction for Indic-Indic evaluation.
+26-May-2026 | Ran Indic-Indic benchmarks on FLORES-200 and Samanantar.
+27-May-2026 | Analyzed LaBSE Indic-Indic results: FLORES mean cosine around 0.8477 and Samanantar-EnglishPivot around 0.7873.
+29-May-2026 | Searched for datasets covering all 22 scheduled Indic languages.
+1-June-2026 | Moved final evaluation to IN22-Gen and IN22-Conv. Implemented Indic-Indic and English-Indic bidirectional tracks.
+2-June-2026 | Analyzed LaBSE results on IN22 Indic-Indic alignment using mean gold cosine, cosine gap, heatmaps, and language rankings.
+3-June-2026 | Added sensitivity and specificity metrics using midpoint and optimal threshold methods.
+4-June-2026 | Continued IN22 LaBSE analysis and generated plots/reports.
+5-June-2026 | Prepared and shared LaBSE baseline summary: LaBSE strongly discriminative; English-Indic stronger than Indic-Indic; IN22-Conv harder than IN22-Gen; weak alignment for Meitei and Santali.
+8-June-2026 | Reported sensitivity and specificity results for IN22 benchmark evaluation.
+9-June-2026 | Started LaBSE fine-tuning experiments on selected top-5 and bottom-5 language-pair groups.
+10-June-2026 | Continued LaBSE training and monitored validation behavior.
+12-June-2026 | Started evaluating 13 models using sensitivity/specificity framework and consolidated initial results.
+[/TABLE]
+A.2 Weekly Summary
+[TABLE]
+Week | Summary
+11-15 May | Completed literature survey of IndicBERT v2, SBERT, Contriever, SimCSE, and LaBSE; studied Indic NLP, multilingual embeddings, contrastive learning, and evaluation methods; created initial Colab notebook.
+18-22 May | Updated benchmark for all language pairs, generated reports and plots, compared Accuracy@1 with cosine threshold evaluation, and created Samanantar average-cosine benchmark.
+25-29 May | Explored English-pivot Indic-Indic alignment, ran FLORES-200 and Samanantar benchmarks, analyzed 80%/77% average performance, and searched for all-22-language datasets.
+1-5 June | Moved final evaluation to IN22-Gen and IN22-Conv, implemented Indic-Indic and English-Indic tracks, added sensitivity/specificity, generated plots/reports, and shared baseline summary.
+8-12 June | Reported sensitivity/specificity results, began LaBSE fine-tuning on top-5 and bottom-5 directed pairs, monitored training, and started 13-model evaluation.
+[/TABLE]
+Appendix B. Reports and Artifacts Used
+[TABLE]
+Report / artifact | Contribution to final report
+Indic_Embedding_Benchmark_Report.docx | FLORES-200 pilot benchmark, 10-model comparison, methodology, metrics, and heatmaps.
+Indic_Embedding_Benchmark_Comparison_Report.docx | Comparison of threshold, average cosine, and retrieval metrics on Samanantar.
+LaBSE_Indic_Indic_Benchmark_Report.docx | FLORES-200 vs Samanantar-EnglishPivot Indic-Indic LaBSE benchmark.
+IN22_Indic_Embedding_Alignment_Report.docx | IN22 all-22-language comparison, LaBSE vs Vyakyarth/MPNet/MuRIL/XLM-R analysis.
+LaBSE_IN22_Benchmark_Report.pdf | LaBSE baseline sensitivity/specificity, per-language ranking, and IN22 heatmaps.
+LaBSE_13ModelReport.pdf | Fine-tuned LaBSE variants, 13-model evaluation, improvements vs baseline, and fine-tuning observations.
+Fine-tuning notebooks | Implementation details for top/bottom source-language and directed-pair fine-tuning experiments.
+[/TABLE]
+Appendix C. Detailed Notion Literature Review Notes
+This appendix incorporates the exported Notion pages that contain the paper-reading summaries and supporting research notes. The main body of the report already summarizes the literature survey at a high level; this appendix preserves the more detailed learning outcomes that guided the benchmark design, model selection, and fine-tuning direction.
+C.1 Notion Workspace and Pages Included
+The Notion export contained a WSAI IITM workspace page linking the literature review database, individual paper notes, benchmark notes, and daily/weekly progress references. The substantive paper-reading pages incorporated here are SBERT, SimCSE, Contriever/mContriever, AI4Bharat IndicNLP Corpus, IndicBERT v2 + IndicXTREME, LaBSE, and Vyakyarth. The export also contained some placeholder pages such as Research Proposal, Proposal Defense, Research Article, Research Presentation, and Page Title; these did not contain substantive text in the export and were not expanded further.
+Workspace page: organized the literature review, paper summaries, benchmark notes, task exports, and progress links.
+Literature Review CSV: captured paper title, authors, datasets, evaluation task, model/method, metrics, limitation/gap, and relevance to the project.
+Paper-note markdown pages: contained detailed explanations of model architecture, training objectives, evaluation metrics, and project relevance.
+Task CSV exports: contained an empty task row in the exported file and therefore did not add new technical content beyond the daily/weekly logs already present in Appendix A.
+C.2 SBERT: Sentence Embeddings from BERT-style Encoders
+The SBERT notes explain why standard BERT/RoBERTa cross-encoders are accurate but inefficient for large-scale similarity search. In a cross-encoder, both sentences are fed together, so every candidate pair must be recomputed. For a collection of 10,000 sentences, this leads to nearly 50 million pairwise comparisons, which is impractical for retrieval-style evaluation.
+SBERT changes this by using a bi-encoder design: each sentence is independently encoded into a reusable vector, and sentence similarity is computed using cosine similarity. This directly motivated the project evaluation pipeline, where each language split is encoded once and then compared using a full cosine-similarity matrix.
+Key method: Siamese/triplet network fine-tuning converts BERT/RoBERTa into a sentence-embedding model.
+Pooling studied: CLS pooling, mean pooling, and max pooling; the notes highlight mean pooling as a strong default in SBERT-style sentence embeddings.
+Training objectives: classification over NLI labels, regression for STS similarity scores, and triplet loss for anchor-positive-negative training.
+Project relevance: SBERT established the difference between token-level language models and sentence-level embedding models, which became important when interpreting why raw XLM-R and IndicBERT-style backbones performed poorly under simple mean pooling.
+C.3 SimCSE: Contrastive Learning, Alignment, and Uniformity
+The SimCSE notes were important for understanding contrastive learning as an embedding-space objective. Unsupervised SimCSE treats the same sentence passed twice through dropout as a positive pair, while other batch examples become negatives. Supervised SimCSE uses NLI entailment pairs as positives and contradiction pairs as hard negatives.
+The main conceptual contribution for this project was the distinction between alignment and uniformity. Alignment means semantically equivalent sentences should be close; uniformity means the embedding space should not collapse so that unrelated sentences also become close. This concept later became central to explaining why high average cosine can still be misleading if random pairs also have high cosine similarity.
+Unsupervised positive creation: same sentence, different dropout masks.
+Supervised positive/negative creation: entailment pairs as positives and contradiction pairs as hard negatives.
+Embedding-space issue: anisotropy causes many sentence vectors to occupy a narrow region, making unrelated sentences look artificially similar.
+Project relevance: motivated reporting cosine gap, sensitivity, specificity, and retrieval metrics rather than only reporting mean gold-pair cosine.
+C.4 Contriever and mContriever: Dense Retrieval without Labeled Pairs
+The Contriever/mContriever notes helped connect contrastive learning to retrieval. The paper studies whether a dense retriever can be trained from raw unaligned documents instead of labeled query-document pairs. It uses a bi-encoder architecture where query and document spans are encoded independently and compared by dot product.
+The notes emphasize positive-pair construction through independent random cropping: two spans from the same document are treated as related views, while spans from other documents act as negatives. The model is optimized with InfoNCE-style contrastive loss. mContriever extends this idea to multilingual retrieval and shows why contrastive methods are useful in low-resource settings where labeled retrieval data is limited.
+Key training idea: construct positives automatically from raw documents using cropping or related context.
+Negative strategy: use in-batch negatives and MoCo-style queues/momentum encoders to increase the number of stable negatives.
+Project relevance: informed the use of in-batch negatives and retrieval-style evaluation for multilingual embedding models.
+C.5 LaBSE: Translation Ranking for Cross-lingual Sentence Alignment
+The LaBSE notes were the most directly connected to the project because LaBSE is a language-agnostic sentence embedding model trained for bitext retrieval. LaBSE uses a shared dual encoder to map source and target sentences into one vector space, where translation pairs should have high similarity and non-translations should have low similarity.
+The paper combines multilingual pretraining with dual-encoder translation ranking and additive margin softmax. In each batch, the correct translation is the positive target and the other target sentences are in-batch negatives. The bidirectional loss trains both source-to-target and target-to-source retrieval. Additive margin softmax forces the correct pair to be clearly better than wrong pairs, not just slightly better.
+Training components studied: MLM, TLM, translation ranking loss, bidirectional loss, in-batch negatives, and additive margin softmax.
+Representation: the notes describe extracting sentence embeddings from the final CLS representation with L2 normalization in the LaBSE setup.
+Project relevance: LaBSE became the primary baseline because its training objective directly matches cross-lingual translation retrieval and sentence alignment.
+Limitation noted: LaBSE is stronger for translation-equivalence retrieval than for fine-grained partial semantic similarity, which is why evaluation should match the task objective.
+C.6 AI4Bharat IndicNLP Corpus, IndicBERT v2, and IndicXTREME
+The IndicNLP and IndicBERT v2 notes explain the data and benchmark background behind Indic-specific language models. The 2020 IndicNLP Corpus work built a large news-crawled corpus for Indic languages and trained FastText embeddings, showing the importance of high-quality Indic data. The later IndicBERT v2 work expanded this into IndicCorp v2, IndicBERT v2, and IndicXTREME.
+IndicCorp v2 is described in the notes as a large 24-language corpus covering the 22 scheduled Indian languages, Indian English, and related languages. IndicBERT v2 uses MLM and TLM objectives; TLM is especially relevant because it uses parallel text to encourage cross-lingual alignment. IndicXTREME provides evaluation tasks including sentence retrieval, which aligns closely with this internship project.
+Main project insight: Indic languages require dedicated evaluation because global multilingual models and tokenizers often favor high-resource languages.
+Dataset insight: FLORES, Samanantar, IndicXParaphrase, and IndicXTREME are relevant because they provide sentence-level or retrieval-style evaluation signals.
+Data-quality insight: high-quality parallel data helps cross-lingual alignment, while noisy back-translated or weakly aligned data can hurt contrastive training.
+Model-selection insight: IndicBERT v2, IndicBERT-SS, and MuRIL are important Indic-focused baselines, but they still need sentence-embedding adaptation for retrieval-style use.
+C.7 Vyakyarth: Indic Semantic Embedding Model
+The Vyakyarth notes describe it as a multilingual Indic sentence embedding model focused on semantic retrieval and cross-lingual alignment. Unlike general multilingual language models that mainly learn token-level language understanding, Vyakyarth is positioned as a sentence embedding model that maps semantically equivalent Indian-language sentences into a shared vector space.
+The notes emphasize that Vyakyarth is based on XLM-R and is fine-tuned for Indic semantic embeddings using contrastive-learning-style objectives. It is relevant for semantic search, multilingual retrieval, clustering, recommendations, and retrieval-augmented generation. This made Vyakyarth an important comparison model in the later IN22 evaluation, where it achieved a strong cosine gap but lower retrieval scores than LaBSE.
+Core goal: same meaning across languages should produce nearby embeddings.
+Technical focus: contrastive learning, semantic alignment, cosine similarity, and cross-lingual embedding geometry.
+Project relevance: used as a strong Indic semantic embedding competitor to LaBSE, especially for alignment and cosine-gap analysis.
+C.8 How the Notion Readings Shaped the Final Methodology
+The Notion paper notes did not remain separate from the implementation; they directly shaped the project methodology. SBERT motivated the use of reusable sentence embeddings and cosine matrices. SimCSE motivated the use of alignment/uniformity language and contrastive separation. Contriever motivated retrieval-style evaluation and negative sampling. LaBSE motivated translation retrieval and additive-margin-style separation. IndicBERT/IndicXTREME motivated all-Indic language coverage and careful dataset choice. Vyakyarth motivated comparison against a newer Indic-specific semantic embedding model.
+Evaluation design moved from only mean cosine to a combined framework: Accuracy@1, Recall@10, MRR, mean gold cosine, random cosine, cosine gap, sensitivity, specificity, and qualitative error analysis.
+Dataset design moved from six-language FLORES testing to all-22-language IN22-Gen and IN22-Conv evaluation.
+Model design moved from benchmarking ready-made embeddings to testing whether targeted contrastive fine-tuning on top/bottom language pairs improves LaBSE.
+Interpretation changed from asking only whether true pairs are close to asking whether true pairs are close and wrong pairs are far enough for reliable retrieval.
+References
+AI4Bharat. IndicBERT v2 / IndicCorp v2 / IndicXTREME related resources and papers on Indic NLP corpora, benchmarks, and models.
+Nils Reimers and Iryna Gurevych. Sentence-BERT: Sentence Embeddings using Siamese BERT-Networks.
+Gautier Izacard et al. Unsupervised Dense Information Retrieval with Contrastive Learning (Contriever).
+Tianyu Gao, Xingcheng Yao, and Danqi Chen. SimCSE: Simple Contrastive Learning of Sentence Embeddings.
+Fangxiaoyu Feng et al. Language-agnostic BERT Sentence Embedding (LaBSE).
+FLORES-200 multilingual evaluation dataset.
+Samanantar English-Indic parallel corpus.
+IN22-Gen and IN22-Conv evaluation suites used for all-22-scheduled-Indic-language alignment evaluation.
+Internal project notebooks, generated benchmark CSVs, plots, heatmaps, and reports prepared during the internship.
+Notion export: SBERT detailed reading notes prepared during the literature survey.
+Notion export: SimCSE detailed reading notes prepared during the literature survey.
+Notion export: Contriever / mContriever detailed reading notes prepared during the literature survey.
+Notion export: LaBSE detailed reading notes prepared during the literature survey.
+Notion export: AI4Bharat IndicNLP Corpus, IndicBERT v2 + IndicXTREME, and Vyakyarth paper notes prepared during the literature survey.

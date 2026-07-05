@@ -1,0 +1,13 @@
+datasets
+huggingface-hub
+jupyter
+matplotlib
+numpy
+openpyxl
+pandas
+scikit-learn
+scipy
+sentence-transformers
+torch
+tqdm
+transformers

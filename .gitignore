@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Environments
+.env
+.venv/
+venv/
+env/
+
+# Jupyter
+.ipynb_checkpoints/
+
+# Model and experiment outputs
+checkpoints/
+models/
+outputs/
+runs/
+wandb/
+*.ckpt
+*.pt
+*.pth
+*.safetensors
+
+# Local result bundles and generated archives
+results/zip_packages/*.zip
+*.zip
+
+# Large local training data exports
+google_drive_import/data/labse_all_pairs_indic_finetuning/all_462_directed_pairs_all_rows.csv
+google_drive_import/data/labse_all_pairs_indic_finetuning/train_pairs_used.csv
+
+# OS/editor files
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+
+# Preserved invalid Git directory from initial workspace state
+.git_invalid_empty_backup/
